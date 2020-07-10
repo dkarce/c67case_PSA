@@ -1,0 +1,312 @@
+---
+title: "STAC67 Case Study: Determining Prostate-Specific Antigen Levels from Various Clinical Measures"
+author: "Group 6 / Bihao Hu 1002341708 / Yichao Huang 1002095902 / Harjot Saroya 1002991382 / Sibo Dong 1003400269"
+date: "November 30, 2018"
+# Please note; some things that work with pdf outputs don't with word documents
+#output: pdf_document
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+
+The purpose of the report is to examine the association between the level of PSA and seven clinical measures for men who were about to undergo radical prostatectomy. Based on statistical criterion, we used statistic model as our approach to the study, and we are able to conclude that there is statistical relationship between the level of PSA and clinical measures.
+
+## Background and significance
+
+Prostate-specific antigen (PSA), also known as gamma-seminoprotein or kallikrein-3 (KLK3), protein produced by normal, as well as malignant, cells of the prostate gland (National Cancer Institute, 2018). The PSA test measures the level of PSA in a man’s blood. In general, the blood level of PSA is elevated in men with prostate cancer. After years of improvement and development, annual PSA test is now recommended by doctors and professional organizations for prostate cancer screening and the level of PSA is now commonly used as one of the monitors of prostate cancer (National Cancer Institute). In that case, it would be helpful if some potential indicators could be found that have statistical relationship with the level of PSA so that doctors would have better ways and spend less time in monitoring and predicting the level of PSA as well as prostate cancer, As a result, the report is trying to determine whether statistical relationship exists between the level of PSA and **seven clinical measures: cancer volume, prostate weight, patient age, the amount of benign prostatic hyperplasia, seminal vesicle invasion, capsular penetration, and Gleason score**.
+
+## Exploratory data analysis
+
+<!-- Set up working directory, adjust categorical data for Gleason score to be represented as two predictors, X7 and X8 (a Gleason score in this dataset can be 6, 7, or 8). X7 is 1 if the Gleason score is 6, 0 o/w; X8 is 1 if the Gleason score is 7, 0 otherwise. -->
+
+```{r, include=FALSE}
+# Set up working directory
+rm(list = ls())
+setwd("~/Documents/UTSC_Documents/Year_3/Fall_2018/STAC67/Case_Study")
+prostate.cancer <- read.table("APPENC05.txt")
+colnames(prostate.cancer) <- c("index", "PSA", "cancer.vol", "prostate.wgt",
+                               "patient.age", "BPH.amt", "SVI", "cap.pen",
+                               "gleason.sc")
+# Create an adjusted data frame with adjusted column names for ease of use
+data.adj <- data.frame(prostate.cancer)
+data.adj$gleason.sc <- as.numeric(prostate.cancer$gleason.sc == 6)
+data.adj <- cbind(data.adj, as.numeric(prostate.cancer$gleason.sc == 7))
+colnames(data.adj) <- c("i", "Y", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8")
+```
+
+This case study is based on Case study 9.30 of Kutner et al. (2004) and refers to the Prostate cancer data set in appendix C.5 of this book. The number of observations in our dataset is 97, and for each observation, we collected its information of the level of PSA as our response variable and seven clinical measures as our predictor variables as mentioned above. The following table summarizes the name of information collected and their type of variable in our model.
+
+Table here.
+
+By conducting a correlation matrix below, we observe the following facts: 
+
+1. The correlation between PSA (response variable) and prostate.wgt, patient.age and BPH.amt are 0.0262, 0.0172 and -0.0165 correspondingly, indicating that these three predictor variables may not have significant statistical relationship with the response variable; on the other hand, the values of correlation between PSA and the rest of predict variables (cancer.vol, SVI, cap.pen and gleason.sc) are relatively large, which means that these variables may be good indicators of the level of PSA. Thus, Cancer.vol, SVI, cap.pen and gleason.sc are important predict variables to consider when generating the model.
+
+2. High correlation (higher than 0.5) between predictors cancer volume and seminal vesicle invasion; cancer volume and capsular penetration; and seminal vesicle invasion and capsular penetration. Further, correlation between gleason.sc and cancer.vol, SVI and cap.pen are relatively significant as well (0.4814, 0.4286 and 0.4616 accordingly). The results may indicate potential multicollinearity among above predictor variables. It could also mean that the optimal model may not incorporate all the predict variables.
+
+```{r}
+round(cor(data.adj[,-1]), digits = 2)  # Don't include indices
+```
+
+<!-- We see that there is multicollinearity as shown above. This means that we must do something about it.-->
+
+## Model
+
+<!-- Observe a scatter plot matrix of the data -->
+
+```{r, include=FALSE}
+pairs(data.adj)
+plot(data.adj$i, data.adj$Y,
+     xlab = "i (indices)",
+     ylab = "Y (PSA)",
+     main = "Y vs i Plot")
+plot(lm(Y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.adj), which = 1)
+plot(lm(Y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.adj), which = 2)
+```
+
+<!-- We observe that the relation between the indices and Y looks exponential and that the diagnostic plots for the full simple linear regression model don't look too good. So we will try to fit the model to the natural logarithm of Y instead of Y. -->
+
+### 1. Data split
+Since the data was already ordered by PSA levels, we decided to split the data into two groups, the first group being a group of all the cases with an even identification number and the second group consisting of all the cases with an odd identification number which allowed our model to be more accurately as the trends for the linear model will be similar when using both of these data sets.  
+The first group (we name it “selection-data”) with 48 observations for selecting the best-fit model, and the second group with the rest 49 observations for model validation (we name this group “validation-data”).
+
+
+```{r, include=FALSE}
+attach(data.adj)
+pairs(cbind(i, log(Y), data.adj[,-c(1, 2)]))
+plot(i, log(Y),
+     xlab = "i (indices)",
+     ylab = "log(Y) (log(PSA))",
+     main = "log(Y) vs i Plot")
+plot(lm(log(Y) ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.adj), which = 1)
+plot(lm(log(Y) ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.adj), which = 2)
+detach(data.adj)
+```
+
+
+<!-- We notice that the data is sorted by lowest PSA to highest PSA. We want to split the data into a dataset for building the model and a dataset for validating the data split. Given that the data is sorted, an even split consists of one dataset cosisting of the even-indexed observations and the other consisting of the odd-indexed observations. -->
+
+```{r}
+model.ind <- seq(2, nrow(data.adj), 2)
+data.mod <- data.adj[model.ind,]
+data.valid <- data.adj[-model.ind,]
+```
+
+### 2. Selection
+
+#### 1) Determine the "type" of model
+
+We can see from the scatterplot matrix and diagnostic plots that taking the logarithm of Y creates a better fit than taking regular Y.
+
+<!-- Construct a full model with response log(Y) -->
+
+```{r, include=FALSE}
+ln.full.mod <- lm(log(Y) ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.mod)
+summary(ln.full.mod)
+```
+
+<!-- Perform backwards selection until all predictor parameters are significant -->
+
+```{r, include=FALSE}
+summary(lm(log(Y) ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8, data = data.mod))
+# Remove X2
+summary(lm(log(Y) ~ X1 + X3 + X4 + X5 + X6 + X7 + X8, data = data.mod))
+# Remove X6
+summary(lm(log(Y) ~ X1 + X3 + X4 + X5 + X7 + X8, data = data.mod))
+# Remove X3
+summary(lm(log(Y) ~ X1 + X4 + X5 + X7 + X8, data = data.mod))
+# Remove X8
+summary(lm(log(Y) ~ X1 + X4 + X5 + X7, data = data.mod))
+# All p-values are significant; STOP
+ln.red.mod <- lm(log(Y) ~ X1 + X4 + X5 + X7, data = data.mod)
+```
+
+Since the gleason score in our data could only take value of 6, 7, and 8, we let the gleason score be a categorical predictor variable for our model, whose value is 1 when the gleason score is 6 and 0 otherwise (we call it “gleason score-6”); also, we created an extra predictor variable for gleason score as well whose value would be 1 if the gleason score is 7 and 0 otherwise (we call it “gleason score-7”).
+
+Through backwards selection we can see the p-values for several variables are significantly larger than the critical value of 5%, we then decide to eliminate the predict variables one by one start from the one with the largest  corresponding p-values. At the end, we end up with the model with four variables “cancer.vol, bph.amt, SVI, gleason score-6” whose p-values are less than the critical value. As a result, the rest variables (“weight”, “age”, “capsular penetration” and “gleason score-7”) will not be considered in this model.
+
+
+#### 2) Determine the optimal model
+
+The next step is to determine the best combination of the four selected variables. By comparing the models based on the criterion, we will have the best fitted model.
+
+<!--We want to see which model using any combination of the significant predictors is the best; apply the 4 criterion of R-square, adjusted R-aquared, Mallow's C, and AIC. -->
+
+```{r, include=FALSE}
+s <- summary(ln.red.mod)$sigma
+n <- nrow(data.mod)
+
+# Function that returns selection criteria
+select.criteria <- function(model, n, s) {
+
+  SSRes <- sum(residuals(model)^2)
+  R.sq <- summary(model)$r.squared
+  R.sq.adj <- summary(model)$adj.r.squared
+  p.prime <- length(model$coefficients)
+  C <- SSRes / s^2 + 2 * p.prime - n
+  AIC <- n * log(SSRes) - n * log(n) + 2 * p.prime
+
+  result <- c(SSRes, R.sq, R.sq.adj, C, AIC)
+  names(result) <- c("SSRes", "R.sq", "R.sq.adj", "C", "AIC")
+
+  return(result)
+}
+
+# Observe criterion for all model combinations
+round(rbind(
+  select.criteria(lm(log(Y) ~ 1, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X4, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X5, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X4, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X5, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X4 + X5, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X4 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X5 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X4 + X5, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X4 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X5 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X4 + X5 + X7, data = data.mod), n, s),
+  select.criteria(lm(log(Y) ~ X1 + X4 + X5 + X7, data = data.mod), n, s)
+), digits = 2)
+```
+
+<!-- As it turns out, our model with 4 predictors is best based on all criterion -->
+
+It is clear that “X1+X4+X5+X7” has highest Rsq value, the adj.Rsq is the upper limit, a small Cp equal to p-prime and smallest AIC. So base on these rules, choose this model as the fitted model.
+
+```{r}
+summary(ln.red.mod)
+```
+
+### 2. Validation
+
+<!-- Compare MSPE and MSRes of the model on the validation dataset -->
+
+```{r, include=FALSE}
+ln.Y.pred <- predict(ln.red.mod, data.valid)
+ln.Y.obs <- log(data.valid$Y)
+n.star <- nrow(data.valid)
+MSPE <- sum((ln.Y.obs - ln.Y.pred)^2) / n.star
+MSRes <- (summary(ln.red.mod)$sigma)^2
+cat("MSPE is ", MSPE, "\n")
+cat("MSRes is", MSRes, "\n")
+```
+
+From the output of R, the MSPE(mean squared prediction error) is 0.73697 and the MSRes is 0.49378. Since the values are very close, so we can say that the predictive ability of this model is very strong.
+
+<!-- We see that both MSPE and MSRes are small, so that is good -->
+
+### 3. Checking for improper functional form
+
+<!-- Checking for improper functional form -->
+
+```{r, message=FALSE, warning=FALSE}
+library(car)
+ln.fit <- lm(log(Y) ~ X1 + X4 + X5 + X7, data = data.adj)
+attach(data.adj)
+par(mfrow = c(2,2), oma = c(1,1,0,0), mar = c(2,2,2,2), tcl = -0.1, mgp = c(1,0,0))
+plot(ln.fit$residuals ~ X1, xlab = "Cancer Volume", ylab = "Residuals")
+abline(h = 0)
+plot(ln.fit$residuals ~ X4, xlab = "BPH Amount", ylab = "Residuals")
+abline(h = 0)
+plot(ln.fit$residuals ~ X5, xlab = "Seminal Vesicle Invasion", ylab = "Residuals")
+abline(h = 0)
+plot(ln.fit$residuals ~ X7, xlab = "Gleason Score (1 if 6, 0 o/w)", ylab = "Residuals")
+abline(h = 0)
+plot(ln.fit$residuals ~ ln.fit$fitted.values, xlab = "Fitted Values", ylab = "Residuals")
+abline(h = 0)
+```
+
+From these graphs, all plots of the residuals against predictor variables have random patterns.
+    *(Since SVI value can only be 0 or 1, and gleason.sc can only be 6 or 7 or 8. We can say that the SVI and gleason.sc are random in their interval)
+
+### 4. Outlying and influential observations
+
+#### 1) Outlying PSA observations
+
+<!-- Outlying Y observations -->
+
+```{r, include=FALSE}
+outlierTest(ln.fit)
+t <- rstudent(ln.fit)
+alpha <- 0.05
+n <- length(Y)
+p.prime <- length(coef(ln.fit))
+t.crit <- qt(1 - alpha / (2 * n), n - p.prime - 1)
+Y.out <- which(abs(t) > t.crit)
+if (length(Y.out) > 0) {
+  cat("Outliers are ", Y.out, "\n")
+} else {
+  cat("No outlying Y\n")
+}
+```
+
+By the test for outlying Y observations, we see that we have no Y (PSA) outliers.
+
+#### 2) Outlying predictor observations
+
+<!-- Outlying X observations -->
+
+```{r, include=FALSE}
+P.ii <- hatvalues(ln.fit)
+which(P.ii > 2 * p.prime / n)
+which(P.ii > 0.5)
+```
+
+From R, we see that observations 55, 61, 76, 78, 91, 94, and 97 are outlying predictor observations.
+
+<!-- Influential observations -->
+
+```{r, include=FALSE}
+# Influential observations
+influencePlot(ln.fit, id.method = "identify",
+              main = "Influence Plot",
+              sub = "Circle size is proportional to Cook's Distance")
+DFFITS <- dffits(ln.fit)
+which(abs(DFFITS) > 1)
+D <- cooks.distance(ln.fit)
+which(D > qf(0.2, p.prime, n - p.prime))
+DFBETAS <- dfbetas(ln.fit)
+#head(DFBEATS)
+which(abs(DFBETAS) > 1)
+```
+
+<!-- We have that 94 is influential on the 94th Y hat value. However, all values
+are less then Cook's distance, so we don't have any influential outliers-->
+
+We see that of all the outliers, only the 94th observation is influential with respect to its DFFITS value. However, all of the Cook's distances are less than the 20th percentile of the Fisher distribution on p-prime and n - p-prime degress of freedom, meaning that none of our outliers are actually influential.
+
+<!-- Multicollinearity -->
+
+```{r, include=FALSE}
+VIF <- vif(ln.fit)
+VIF.bar <- mean(VIF)
+VIF.bar
+```
+
+<!-- Mean of VIF is close to 1, so little multicollinearity -->
+
+We see that our mean VIF value is close to 1, indicating that there is no serious multicollinearity.
+
+## Discussion/Conclusions
+
+The purpose of this report is trying to find some potential indicators that have significant statistic relationship with the level of PSA so that it could be possible to forecast the “PSA” level based on the figure of the potential indicators. Based on our work, we determine that “PSA” has a statistical (linear) relationship with “cancer volume”, “BPH.amt”, “SVI” and “gleason score-6”. More specifically, R-squrare% of the variation of “PSA” is explained by the above variables.  
+We see that the values of beta-1-hat, beta-2-hat, beta-3-hat, and beta-4-hat are 0.06, 0.10, 0.92, and -0.53 respectively for predictors cancer volume, BPH amount, SVI, and gleason score-6. We interpret each beta-hat as the the change in the level of PSA for each unit increase in the respective predictor (except for gleason score-6, in which if the gleason score is 6 and not 7 or 8, the PSA decreases by -0.53). Thus, we see that in general, an increase in cancer volume, BPH amount, SVI, and gleason score (can be 6, 7, or 8) leads to an increase in PSA.
+    Our findings are vital to the related field because as we mentioned before, PSA test is now commonly used for screening prostate cancer. If we could incorporate more indicators that have correlation with the “PSA” level, it would make the test more effective and could become better as a monitor of prostate cancer.
+
+## Limitations
+
+1. We selected a sample of 97 men with advanced prostate cancer in which Serum prostate-specific antigen (PSA) was determined. However, it is possible that PSA being found in a men with no prostate cancer. More specifically, the data selected does not take the potential relationship between “whether a man has prostate cancer or not” and the “PSA” level into account, which may be crucial. As a result, our conclusion generated based on the current data could be biased and inaccurate.
+2. Since we have to determine the relationship between the response variable and 7 clinical measurements, it would be better if we could have a larger data set (more than 97 observations). In that case, the data set may provide clearer information about the correlation between the variables, which could improve the results of our study
+
+
+## Appendix
+
+## Reference
